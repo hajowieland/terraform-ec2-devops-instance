@@ -1,0 +1,59 @@
+- hosts: all
+  become: true
+
+  tasks:
+    - name: upgrade all packages
+      yum: name=* state=latest
+      become: yes
+ 
+    - name: install git
+      yum:
+          name: git
+          state: present
+
+    - name: Enable and install amazon-linux-extras docker
+      shell: "amazon-linux-extras install docker -y"
+      become: yes
+   
+    - name: Add user to docker group
+      shell: "usermod -g docker ec2-user"
+      become: yes
+    - name: get latest terraform version id
+      uri:
+        url: 'https://checkpoint-api.hashicorp.com/v1/check/terraform'
+        method: GET
+        status_code: 200
+        timeout: 10
+      register: release
+
+    - set_fact:
+        version: "{{ release.json | json_query('current_version') }}"
+
+    - name: terraform is present
+      get_url:
+        url: 'https://releases.hashicorp.com/terraform/{{ version }}/terraform_{{ version }}_linux_amd64.zip'
+        dest: '/tmp/terraform.zip'
+    
+    - name: unzip terraform
+      unarchive:
+        src: /tmp/terraform.zip
+        dest: /usr/local/bin
+        remote_src: yes
+
+    - name: enable systemd docker service
+      systemd:
+          name: docker
+          enabled: yes
+
+    - name: start systemd docker service
+      systemd:
+          state: started
+          name: docker
+
+    - name: create aws home directory
+      file:
+          path: /home/ec2-user/.aws
+          state: directory
+          owner: ec2-user
+          group: ec2-user
+          mode: 0775
