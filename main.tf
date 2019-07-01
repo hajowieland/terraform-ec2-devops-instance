@@ -1,10 +1,3 @@
-provider "aws" {
-  access_key = var.aws_access_key
-  secret_key = var.aws_secret_key
-  region     = var.aws_region
-  profile    = var.aws_profile
-}
-
 data "aws_availability_zones" "available" {
 }
 
@@ -21,14 +14,19 @@ resource "aws_default_vpc" "default-vpc" {
 
 resource "aws_vpc_ipv4_cidr_block_association" "secondary-cidr" {
   vpc_id     = aws_default_vpc.default-vpc.id
-  cidr_block = "172.2.0.0/16"
+  cidr_block = var.vpc_cidr
 }
 
 resource "aws_subnet" "dev-subnet" {
   vpc_id                          = aws_vpc_ipv4_cidr_block_association.secondary-cidr.vpc_id
-  cidr_block                      = "172.2.0.0/24"
+  cidr_block                      = cidrsubnet(var.vpc_cidr, 4, 1)
   ipv6_cidr_block                 = cidrsubnet(aws_default_vpc.default-vpc.ipv6_cidr_block, 8, 1)
   assign_ipv6_address_on_creation = true
+
+  tags = {
+    Project = "devops-instance"
+    ManagedBy = "terraform"
+  }
 }
 
 ## Route Table:
@@ -51,6 +49,11 @@ resource "aws_default_route_table" "dev-rt" {
   route {
     ipv6_cidr_block = "::/0"
     gateway_id      = data.aws_internet_gateway.dev-igw.id
+  }
+
+  tags = {
+    Project = "devops-instance"
+    ManagedBy = "terraform"
   }
 }
 
@@ -78,6 +81,13 @@ resource "aws_security_group" "dev_security_group" {
     ipv6_cidr_blocks = ["::/0"]
   }
 
+  # mosh
+  ingress {
+    from_port = 60000
+    to_port   = 61000
+    protocol  = "udp"
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -90,6 +100,11 @@ resource "aws_security_group" "dev_security_group" {
     to_port          = 0
     protocol         = "-1"
     ipv6_cidr_blocks = ["::/0"]
+  }
+
+  tags = {
+    Project = "devops-instance"
+    ManagedBy = "terraform"
   }
 }
 
@@ -104,11 +119,7 @@ resource "aws_key_pair" "dev_key_pair" {
 
 data "aws_ami" "amzn2" {
   most_recent = true
-
-  filter {
-    name   = "owner-alias"
-    values = ["amazon"]
-  }
+  owners      = ["amazon"]
 
   filter {
     name   = "name"
@@ -144,13 +155,29 @@ resource "aws_instance" "dev_machine" {
   provisioner "local-exec" {
     command = "sleep 60; ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -u ec2-user --private-key ~/.ssh/${var.dev_key_pair_name}.pub -i '${aws_instance.dev_machine.public_ip},' dev_machine.yml"
   }
+
+  tags = {
+    Name = "private-devops-instance"
+    Project = "devops-instance"
+    ManagedBy = "terraform"
+  }
+}
+
+resource "aws_eip" "eip" {
+  instance = aws_instance.dev_machine.id
+  vpc      = true
+
+  tags = {
+    Project = "devops-instance"
+    ManagedBy = "terraform"
+  }
 }
 
 ## Add EC2 public IP to SSH config:
 
 resource "null_resource" "add_to_ssh" {
   provisioner "local-exec" {
-    command = "echo '' >> ~/.ssh/config ; echo 'Host aws-dev' >> ~/.ssh/config ; echo '  HostName ${aws_instance.dev_machine.public_ip}' >> ~/.ssh/config ; echo '  User ec2-user' >> ~/.ssh/config ; echo '  IdentityFile ~/.ssh/${var.dev_key_pair_name}.pub' >> ~/.ssh/config"
+    command = "echo '' >> ~/.ssh/config ; echo 'Host aws-dev' >> ~/.ssh/config ; echo '  HostName ${aws_eip.eip.public_ip}' >> ~/.ssh/config ; echo '  User ec2-user' >> ~/.ssh/config ; echo '  IdentityFile ~/.ssh/${var.dev_key_pair_name}.pub' >> ~/.ssh/config"
   }
 
   depends_on = [aws_instance.dev_machine]
