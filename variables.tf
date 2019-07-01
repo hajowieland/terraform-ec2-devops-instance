@@ -8,6 +8,9 @@ variable "aws_profile" {
 }
 
 variable "project_name" {
+  description = "Project name to use (for tags, etc.)"
+  type = string
+  value = "devops-instance"
 }
 
 variable "dev_key_pair_name" {

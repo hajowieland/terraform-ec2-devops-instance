@@ -24,7 +24,7 @@ resource "aws_subnet" "dev-subnet" {
   assign_ipv6_address_on_creation = true
 
   tags = {
-    Project = "devops-instance"
+    Project = var.project_name
     ManagedBy = "terraform"
   }
 }
@@ -52,7 +52,7 @@ resource "aws_default_route_table" "dev-rt" {
   }
 
   tags = {
-    Project = "devops-instance"
+    Project = var.project_name
     ManagedBy = "terraform"
   }
 }
@@ -103,7 +103,7 @@ resource "aws_security_group" "dev_security_group" {
   }
 
   tags = {
-    Project = "devops-instance"
+    var.project_name
     ManagedBy = "terraform"
   }
 }
@@ -157,8 +157,8 @@ resource "aws_instance" "dev_machine" {
   }
 
   tags = {
-    Name = "private-devops-instance"
-    Project = "devops-instance"
+    Name = var.project_name
+    Project = var.project_name
     ManagedBy = "terraform"
   }
 }
@@ -168,7 +168,7 @@ resource "aws_eip" "eip" {
   vpc      = true
 
   tags = {
-    Project = "devops-instance"
+    Project = var.project_name
     ManagedBy = "terraform"
   }
 }
