@@ -103,7 +103,7 @@ resource "aws_security_group" "dev_security_group" {
   }
 
   tags = {
-    var.project_name
+    Project = var.project_name
     ManagedBy = "terraform"
   }
 }
