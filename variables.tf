@@ -1,10 +1,7 @@
-variable "aws_access_key" {
-}
-
-variable "aws_secret_key" {
-}
-
 variable "aws_region" {
+  description = "AWS region to use (e.g. `eu-central-1`)"
+  type = string
+  default = "eu-central-1"
 }
 
 variable "aws_profile" {
@@ -24,4 +21,9 @@ variable "dev_instance_type" {
   default     = "t3.micro"
   type        = string
 }
+
+variable "vpc_cidr" {
+  default = "10.23.0.0/16"
+}
+
 
